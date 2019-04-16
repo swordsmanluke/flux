@@ -10,6 +10,11 @@ interface TextView {
     fun getLines() : Collection<String>
 }
 
+class BasicTextView : TextView{
+    override var lines: MutableList<String> = mutableListOf()
+    override fun getLines(): Collection<String> = lines
+}
+
 enum class ScrollDirection {
     UP,
     DOWN,

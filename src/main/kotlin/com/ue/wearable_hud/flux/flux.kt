@@ -1,11 +1,14 @@
 package com.ue.wearable_hud.flux
 
+import com.ue.wearable_hud.flux.task.Task
 import java.io.File
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 fun main(args: Array<String>) {
-    val curDir = File(".")
+    val curDir = File("/home/lucas/Software/dark_goggles-0.1/bin")
+    val command = "./dark_goggles daily"
+    val darkGoggles = Task(curDir, command)
+
+    println(darkGoggles.run())
 
     val (lines, columns) = getTerminalDimensions()
     println("Lines   = $lines")
@@ -19,30 +22,3 @@ private fun getTerminalDimensions(): Pair<Int, Int> {
 }
 
 fun gotoxy(x: Int, y: Int) = print("\u001B[$x;${y}H")
-
-fun runCommand(workingDir: File, command: String): String? {
-    try {
-        val parts = command.split("\\s".toRegex())
-        val proc = ProcessBuilder(*parts.toTypedArray())
-                .directory(workingDir)
-                .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                .redirectError(ProcessBuilder.Redirect.PIPE)
-                .start()
-
-        proc.waitFor(60, TimeUnit.MINUTES)
-        return proc.inputStream.bufferedReader().readText()
-    } catch(e: IOException) {
-        e.printStackTrace()
-        return null
-    }
-}
-
-fun runCommandOut(workingDir: File, command: String) {
-    val parts = command.split("\\s".toRegex())
-    ProcessBuilder(*parts.toTypedArray())
-            .directory(workingDir)
-            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .start()
-            .waitFor(60, TimeUnit.MINUTES)
-}
