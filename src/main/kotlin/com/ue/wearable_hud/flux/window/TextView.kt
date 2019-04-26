@@ -1,18 +1,18 @@
 package com.ue.wearable_hud.flux.window
 
-import com.ue.wearable_hud.flux.extensions.safeSlice
+import com.ue.wearable_hud.flux.extensions.visibleCharSlice
 
 interface TextView {
-    var lines: MutableList<String>
+    var storedLines: MutableList<String>
 
-    fun replaceLines(lines: Collection<String>) { this.lines = mutableListOf(*lines.toTypedArray()) }
-    fun addLines(lines: Collection<String>) { this.lines.addAll(lines) }
-    fun getLines() : Collection<String>
+    fun replaceLines(lines: Collection<String>) { this.storedLines = mutableListOf(*lines.toTypedArray()) }
+    fun addLines(lines: Collection<String>) { this.storedLines.addAll(lines) }
+    fun getLines() : List<String>
 }
 
 class BasicTextView : TextView{
-    override var lines: MutableList<String> = mutableListOf()
-    override fun getLines(): Collection<String> = lines
+    override var storedLines: MutableList<String> = mutableListOf()
+    override fun getLines(): List<String> = storedLines
 }
 
 enum class ScrollDirection {
@@ -22,11 +22,11 @@ enum class ScrollDirection {
     RIGHT
 }
 
-class ScollableTextView(val width: Int, val height: Int):TextView {
+class ScrollableTextView(val width: Int, val height: Int):TextView {
     var offsetX = 0
     var offsetY = 0
 
-    override var lines: MutableList<String> = mutableListOf()
+    override var storedLines: MutableList<String> = mutableListOf()
 
     fun scroll(direction: ScrollDirection, amount: Int = 1) {
         when(direction) {
@@ -36,10 +36,10 @@ class ScollableTextView(val width: Int, val height: Int):TextView {
             ScrollDirection.RIGHT -> offsetX += amount
         }
 
-        val maxLength = lines.maxBy { it.length }?.length ?: 0
+        val maxLength = storedLines.maxBy { it.length }?.length ?: 0
 
         offsetX = stayWithinBounds(offsetX, 0, Math.max(0, maxLength - width))
-        offsetY = stayWithinBounds(offsetY, 0, Math.max(0, lines.size - height))
+        offsetY = stayWithinBounds(offsetY, 0, Math.max(0, storedLines.size - height))
     }
 
     private fun stayWithinBounds(value: Int, min: Int, max: Int): Int {
@@ -48,13 +48,13 @@ class ScollableTextView(val width: Int, val height: Int):TextView {
         else                     { value }
     }
 
-    override fun getLines(): Collection<String> {
-        val lastStringIndex = stayWithinBounds(offsetY + height, 0, lines.size)
-        val maxLength = lines.maxBy { it.length }?.length ?: 0
+    override fun getLines(): List<String> {
+        val lastStringIndex = stayWithinBounds(offsetY + height, 0, storedLines.size)
+        val maxLength = storedLines.maxBy { it.length }?.length ?: 0
         val lastWidthPos = stayWithinBounds(offsetX + width, 0, maxLength)
-        return lines.
+        return storedLines.
                 slice(offsetY until lastStringIndex).
-                map{ it.safeSlice(offsetX until (offsetX + width)) }
+                map{ it.visibleCharSlice(offsetX until lastWidthPos) }
     }
 
 }
