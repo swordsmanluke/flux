@@ -1,6 +1,7 @@
 package com.ue.wearable_hud.flux.window
 
 import com.ue.wearable_hud.flux.extensions.visibleCharSlice
+import org.w3c.dom.Text
 
 interface TextView {
     var storedLines: MutableList<String>
@@ -57,4 +58,12 @@ class ScrollableTextView(val width: Int, val height: Int):TextView {
                 map{ it.visibleCharSlice(offsetX until lastWidthPos) }
     }
 
+}
+
+class NullView: TextView {
+    override var storedLines: MutableList<String>
+        get() = mutableListOf()
+        set(value) {}
+
+    override fun getLines(): List<String> = storedLines
 }

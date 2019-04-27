@@ -4,15 +4,20 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class Task(val workingDir: File, val command: String) {
+interface Task {
+    fun getLines(): Collection<String>
+    fun run(): Collection<String>
+}
+
+class UnixTask(val workingDir: File, val command: String): Task {
 
     private var lines : Collection<String> = emptyList()
 
-    fun getLines() : Collection<String> {
+    override fun getLines() : Collection<String> {
         return lines
     }
 
-    fun run(): Collection<String> {
+    override fun run(): Collection<String> {
         try {
             val parts = command.split("\\s".toRegex())
             val proc = ProcessBuilder(*parts.toTypedArray())
@@ -30,4 +35,9 @@ class Task(val workingDir: File, val command: String) {
             return emptyList()
         }
     }
+}
+
+class NullTask(): Task {
+    override fun getLines() : Collection<String> = emptyList()
+    override fun run(): Collection<String> = emptyList()
 }

@@ -58,3 +58,20 @@ fun String.visibleCharSlice(indices: IntRange): String {
 
     return leadingVT100Code + this.safeSlice(startSliceIndex..endSliceIndex) + trailingVT100Sequence
 }
+
+fun String.visibleCharPadEnd(length: Int, padChar: Char = ' '): String {
+    val padLength = Math.max(0, length - this.visibleCharLength())
+    return this.padEnd(this.length + padLength, padChar)
+}
+
+private fun String.visibleCharLength(): Int {
+    val matches = vt100EscapeSequences.findAll(this).toList()
+    val escapeSeqLength = if (matches.count() == 0) {
+        0
+    } else {
+        matches.sumBy { (it.range.endInclusive - it.range.start) + 1}
+    }
+
+    val visisbleLength = this.length - escapeSeqLength
+    return visisbleLength
+}

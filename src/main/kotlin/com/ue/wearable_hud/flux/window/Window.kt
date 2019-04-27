@@ -20,3 +20,5 @@ data class Window(val handle: Int, val x: Int, val y: Int, val width: Int, val h
         return true
     }
 }
+
+fun NullWindow() = Window(0,0,0,0,0)

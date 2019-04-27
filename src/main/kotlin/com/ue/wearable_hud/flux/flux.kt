@@ -1,42 +1,60 @@
 package com.ue.wearable_hud.flux
 
+import com.ue.wearable_hud.flux.program.Flux
+import com.ue.wearable_hud.flux.task.NullTask
 import com.ue.wearable_hud.flux.task.Task
-import com.ue.wearable_hud.flux.window.BasicTextView
-import com.ue.wearable_hud.flux.window.ScrollDirection
-import com.ue.wearable_hud.flux.window.ScrollableTextView
-import com.ue.wearable_hud.flux.window.WindowManager
+import com.ue.wearable_hud.flux.task.UnixTask
+import com.ue.wearable_hud.flux.window.*
 import java.io.File
 
 fun main(args: Array<String>) {
+    // Raspi view size: 84 col x 22 lines
     val wm = WindowManager()
-    val w1 = wm.createNewWindow(1, 1, 8, 10)
+    val viewForWindow = mutableMapOf<Int, TextView>()
+    val taskForWindow = mutableMapOf<Int, Task>()
+    val tasks = mutableListOf<Task>()
 
-    val curDir = File("/home/lucas/Software/dark_goggles-0.1/bin")
-    val command = "./dark_goggles daily"
-    val darkGoggles = Task(curDir, command)
-    darkGoggles.run()
-    val tv =  ScrollableTextView(20, 10)
-    tv.replaceLines(darkGoggles.getLines())
+    val dailyForecastWindow = wm.createNewWindow(1, 1, 16, 1)
+    val hourlyForecastWindow = wm.createNewWindow(1, 2, 16, 1)
 
-    wm.displayText(w1, tv)
+    viewForWindow[dailyForecastWindow] = ScrollableTextView(16, 1)
+    viewForWindow[hourlyForecastWindow] = ScrollableTextView(16, 1)
 
-    (1..1).forEach {
-        tv.scroll(ScrollDirection.RIGHT, 3)
+    val dailyForecast = dailyForecastTask()
+    tasks.add(dailyForecast)
 
-        wm.displayText(w1, tv)
-        Thread.sleep(250)
-    }
+    val hourlyForecast = hourlyForecastTask()
+    tasks.add(hourlyForecast)
 
-    (1..1).forEach{
-        tv.scroll(ScrollDirection.LEFT, 3)
+    taskForWindow[dailyForecastWindow] = dailyForecast
+    taskForWindow[hourlyForecastWindow] = hourlyForecast
 
-        wm.displayText(w1, tv)
-        Thread.sleep(250)
-    }
+    val prog = Flux(wm, viewForWindow, taskForWindow, tasks)
+    prog.run()
 
     val (lines, columns) = getTerminalDimensions()
 //    println("Lines   = $lines")
 //    println("Columns = $columns")
+}
+
+private fun dailyForecastTask(): Task {
+    return forecastTask(ForecastType.DAILY)
+}
+
+private fun hourlyForecastTask(): Task {
+    return forecastTask(ForecastType.HOURLY)
+}
+
+enum class ForecastType {
+    HOURLY,
+    DAILY
+}
+
+private fun forecastTask(type: ForecastType): Task {
+    val curDir = File("/home/lucas/Software/dark_goggles-0.1/bin")
+    val command = "./dark_goggles ${type.toString().toLowerCase()}"
+    val darkGoggles = UnixTask(curDir, command)
+    return darkGoggles
 }
 
 private fun getTerminalDimensions(): Pair<Int, Int> {
