@@ -5,19 +5,41 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 interface Task {
+    fun nextRunAt(): Long
+    fun readyToSchedule(): Boolean
     fun getLines(): Collection<String>
-    fun run(): Collection<String>
+    suspend fun run(): Collection<String>
 }
 
-class UnixTask(val workingDir: File, val command: String): Task {
+class StaticTask(var strings: Collection<String>): Task {
+    fun update(newStrings: Collection<String>) {
+        strings = newStrings
+    }
 
-    private var lines : Collection<String> = emptyList()
+    override fun nextRunAt(): Long = Long.MAX_VALUE
+    override fun readyToSchedule(): Boolean = false // Never updates
+    override fun getLines(): Collection<String> = strings
+    override suspend fun run(): Collection<String> = strings
+}
 
-    override fun getLines() : Collection<String> {
+class UnixTask(val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
+
+    private var lines: Collection<String> = emptyList()
+    private var lastRun = 0L
+
+    override fun nextRunAt(): Long {
+        return lastRun + refreshPeriodSec * 1000
+    }
+
+    override fun readyToSchedule(): Boolean {
+        return System.currentTimeMillis() > nextRunAt()
+    }
+
+    override fun getLines(): Collection<String> {
         return lines
     }
 
-    override fun run(): Collection<String> {
+    override suspend fun run(): Collection<String> {
         try {
             val parts = command.split("\\s".toRegex())
             val proc = ProcessBuilder(*parts.toTypedArray())
@@ -28,16 +50,19 @@ class UnixTask(val workingDir: File, val command: String): Task {
 
             proc.waitFor(60, TimeUnit.MINUTES)
             val text = proc.inputStream.bufferedReader().readText()
+            lastRun = System.currentTimeMillis()
             lines = text.split("\n")
             return lines
-        } catch(e: IOException) {
+        } catch (e: IOException) {
             e.printStackTrace()
             return emptyList()
         }
     }
 }
 
-class NullTask(): Task {
-    override fun getLines() : Collection<String> = emptyList()
-    override fun run(): Collection<String> = emptyList()
+class NullTask : Task {
+    override fun nextRunAt(): Long = Long.MAX_VALUE // Never needs to be scheduled
+    override fun readyToSchedule(): Boolean = false // Never needs to be run
+    override fun getLines(): Collection<String> = emptyList()
+    override suspend fun run(): Collection<String> = emptyList()
 }

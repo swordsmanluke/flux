@@ -48,4 +48,30 @@ class StringTest {
         val sliced = PLAIN_TEST.visibleCharSlice(2..3)
         assertThat(sliced, `is`(PLAIN_TEST.slice(2..3)))
     }
+
+    // Padding End of strings
+
+    @Test
+    fun paddingAddsExpectedExtraCharsToPlainStrings() {
+        val padded = "TEST".visibleCharPadEnd(5, ' ')
+        assertThat(padded, `is`("TEST "))
+    }
+
+    @Test
+    fun paddingAddsExpectedExtraCharsToVT100Strings() {
+        val padded = VT100_TEST.visibleCharPadEnd(5, ' ')
+        assertThat(padded, `is`("$VT100_TEST "))
+    }
+
+    @Test
+    fun paddingAddsNoExtraCharsToVT100StringsWhenStringIsLongerThanPad() {
+        val padded = VT100_TEST.visibleCharPadEnd(3, ' ')
+        assertThat(padded, `is`(VT100_TEST))
+    }
+
+    @Test
+    fun paddingAddsNoExtraCharsToPlainStringsWhenStringIsLongerThanPad() {
+        val padded = PLAIN_TEST.visibleCharPadEnd(3, ' ')
+        assertThat(padded, `is`(PLAIN_TEST))
+    }
 }

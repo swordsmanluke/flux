@@ -6,13 +6,14 @@ import com.ue.wearable_hud.flux.extensions.visibleCharSlice
 class WindowManager {
     private var nextHandle = 1
     private val _windows = mutableListOf<Window>()
+    private val viewLastUpdated = mutableMapOf<TextView, Long>()
 
-    fun createNewWindow(xPos: Int, yPos: Int, width: Int, height: Int): Int {
+    fun createNewWindow(xPos: Int, yPos: Int, width: Int, height: Int): Window {
         val w = Window(nextHandle++, xPos, yPos, width, height)
         validateDoesNotOverlap(w)
         // TODO: Bounds check against terminal size
         _windows.add(w)
-        return w.handle
+        return w
     }
 
     val windows : List<Window>
@@ -20,16 +21,21 @@ class WindowManager {
 
     private fun validateDoesNotOverlap(w: Window) {
         // TODO: Probably want to get rid of this constraint.
-        // TODO: It could make sense for us to have modal _windows, for instance.
+        // TODO: It could make sense for us to have modal windows, for instance.
         if (_windows.any { it.overlaps(w) }) {
-            throw IllegalArgumentException("Window $w would overlap existing _windows!")
+            throw IllegalArgumentException("Window $w would overlap existing windows!")
         }
     }
 
     fun displayText(handle: Int, textView: TextView) {
-        val window = _windows.find { it.handle == handle } ?: return
-        val formattedLines = formatText(textView, window)
-        printFormattedLines(formattedLines, window)
+        val lastUpdated = viewLastUpdated[textView] ?: 0L
+        if (lastUpdated < textView.lastUpdated) {
+            viewLastUpdated[textView] = textView.lastUpdated
+
+            val window = _windows.find { it.handle == handle } ?: return
+            val formattedLines = formatText(textView, window)
+            printFormattedLines(formattedLines, window)
+        }
     }
 
     private fun printFormattedLines(finalLinesToPrint: List<String>, window: Window) {

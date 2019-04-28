@@ -1,24 +1,36 @@
 package com.ue.wearable_hud.flux
 
 import com.ue.wearable_hud.flux.program.Flux
-import com.ue.wearable_hud.flux.task.NullTask
 import com.ue.wearable_hud.flux.task.Task
 import com.ue.wearable_hud.flux.task.UnixTask
 import com.ue.wearable_hud.flux.window.*
 import java.io.File
+import kotlinx.coroutines.*
+
+val ESC = "\u001B" // Used in our printer codes
 
 fun main(args: Array<String>) {
     // Raspi view size: 84 col x 22 lines
     val wm = WindowManager()
-    val viewForWindow = mutableMapOf<Int, TextView>()
-    val taskForWindow = mutableMapOf<Int, Task>()
+    val viewForWindow = mutableMapOf<Window, TextView>()
+    val taskForWindow = mutableMapOf<Window, Task>()
     val tasks = mutableListOf<Task>()
 
-    val dailyForecastWindow = wm.createNewWindow(1, 1, 16, 1)
-    val hourlyForecastWindow = wm.createNewWindow(1, 2, 16, 1)
+    // Top bar
+    var topX = 1
+
+    val dailyForecastWindow = wm.createNewWindow(topX, 1, 16, 1)
+    topX += dailyForecastWindow.width + 4 // Padding
+    val timeWindow = wm.createNewWindow(topX, 1, 28, 1)
+    topX += timeWindow.width + 4 // Padding
+    val hourlyForecastWindow = wm.createNewWindow(topX, 1, 16, 1)
+
+    val mainWindow = wm.createNewWindow(3,2,81,15)
 
     viewForWindow[dailyForecastWindow] = ScrollableTextView(16, 1)
     viewForWindow[hourlyForecastWindow] = ScrollableTextView(16, 1)
+    viewForWindow[timeWindow] = BasicTextView()
+    viewForWindow[mainWindow] = ScrollableTextView(81, 17)
 
     val dailyForecast = dailyForecastTask()
     tasks.add(dailyForecast)
@@ -26,15 +38,37 @@ fun main(args: Array<String>) {
     val hourlyForecast = hourlyForecastTask()
     tasks.add(hourlyForecast)
 
+    val time = datetimeTask()
+    tasks.add(time)
+
+    val todoList = todoListTask()
+    tasks.add(todoList)
+
     taskForWindow[dailyForecastWindow] = dailyForecast
     taskForWindow[hourlyForecastWindow] = hourlyForecast
+    taskForWindow[timeWindow] = time
+    taskForWindow[mainWindow] = todoList
 
-    val prog = Flux(wm, viewForWindow, taskForWindow, tasks)
-    prog.run()
+    showCursor(false)
 
-    val (lines, columns) = getTerminalDimensions()
-//    println("Lines   = $lines")
-//    println("Columns = $columns")
+    val prog = Flux(wm, viewForWindow, taskForWindow, tasks, mainWindow.handle)
+
+    Runtime.getRuntime().addShutdownHook(object : Thread() {
+        override fun run() {
+            println("\nShutdown")
+            showCursor(true)
+            // TODO: Add shutdown code here
+        }
+    })
+
+    runBlocking { prog.run() }
+}
+
+private fun datetimeTask(): Task {
+    val curDir = File("./")
+    val command = "date"
+    val time = UnixTask(curDir, command, 1)
+    return time
 }
 
 private fun dailyForecastTask(): Task {
@@ -50,11 +84,20 @@ enum class ForecastType {
     DAILY
 }
 
+private val TEN_MINUTES = 600
+
 private fun forecastTask(type: ForecastType): Task {
     val curDir = File("/home/lucas/Software/dark_goggles-0.1/bin")
     val command = "./dark_goggles ${type.toString().toLowerCase()}"
-    val darkGoggles = UnixTask(curDir, command)
-    return darkGoggles
+    val forecast = UnixTask(curDir, command, TEN_MINUTES)
+    return forecast
+}
+
+private fun todoListTask(): Task {
+    val curDir = File("/home/lucas/workspace/wearable_hud/hud-todo-list")
+    val command = "./dist/__main__/todolist"
+    val todoList = UnixTask(curDir, command, TEN_MINUTES)
+    return todoList
 }
 
 private fun getTerminalDimensions(): Pair<Int, Int> {
@@ -63,4 +106,11 @@ private fun getTerminalDimensions(): Pair<Int, Int> {
     return Pair(lineStr.toInt(), colStr.toInt())
 }
 
-fun gotoxy(x: Int, y: Int) = print("\u001B[$x;${y}H")
+fun showCursor(show: Boolean)  {
+    if (show) {
+        print("$ESC[25h")
+    }
+    else {
+        print("$ESC[25l")
+    }
+}

@@ -1,17 +1,36 @@
 package com.ue.wearable_hud.flux.window
 
 import com.ue.wearable_hud.flux.extensions.visibleCharSlice
-import org.w3c.dom.Text
 
 interface TextView {
     var storedLines: MutableList<String>
+    var lastUpdated: Long
 
-    fun replaceLines(lines: Collection<String>) { this.storedLines = mutableListOf(*lines.toTypedArray()) }
-    fun addLines(lines: Collection<String>) { this.storedLines.addAll(lines) }
+    fun replaceLines(lines: Collection<String>) {
+        if (linesDiffer(storedLines, lines)) {
+            lastUpdated = System.currentTimeMillis()
+        }
+        this.storedLines = mutableListOf(*lines.toTypedArray())
+    }
+
+    private fun linesDiffer(lines1: Collection<String>, lines2: Collection<String>): Boolean {
+        if (lines1.count() != lines2.count()) { return true }
+        lines1.zip(lines2).forEach { (i, j) ->
+            if (i != j) { return true }
+        }
+        return false
+    }
+
+    fun addLines(lines: Collection<String>) { this.storedLines.addAll(lines); lastUpdated = System.currentTimeMillis() }
     fun getLines() : List<String>
 }
 
 class BasicTextView : TextView{
+    private var _lastUpdated = 0L
+    override var lastUpdated: Long
+        get() = _lastUpdated
+        set(value) { _lastUpdated = value }
+
     override var storedLines: MutableList<String> = mutableListOf()
     override fun getLines(): List<String> = storedLines
 }
@@ -28,6 +47,10 @@ class ScrollableTextView(val width: Int, val height: Int):TextView {
     var offsetY = 0
 
     override var storedLines: MutableList<String> = mutableListOf()
+    private var _lastUpdated = 0L
+    override var lastUpdated: Long
+        get() = _lastUpdated
+        set(value) { _lastUpdated = value }
 
     fun scroll(direction: ScrollDirection, amount: Int = 1) {
         when(direction) {
@@ -61,6 +84,10 @@ class ScrollableTextView(val width: Int, val height: Int):TextView {
 }
 
 class NullView: TextView {
+    override var lastUpdated: Long
+        get() = System.currentTimeMillis()
+        set(_) { }
+
     override var storedLines: MutableList<String>
         get() = mutableListOf()
         set(value) {}
