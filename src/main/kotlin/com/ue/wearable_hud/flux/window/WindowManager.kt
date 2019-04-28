@@ -3,7 +3,8 @@ package com.ue.wearable_hud.flux.window
 import com.ue.wearable_hud.flux.extensions.visibleCharPadEnd
 import com.ue.wearable_hud.flux.extensions.visibleCharSlice
 
-class WindowManager {
+class WindowManager(val console: Console) {
+
     private var nextHandle = 1
     private val _windows = mutableListOf<Window>()
     private val viewLastUpdated = mutableMapOf<TextView, Long>()
@@ -40,15 +41,15 @@ class WindowManager {
 
     private fun printFormattedLines(finalLinesToPrint: List<String>, window: Window) {
         finalLinesToPrint.forEachIndexed { i, line ->
-            printAtXY(window.x, window.y + i, line)
+            console.printAtXY(window.x, window.y + i, line)
         }
     }
 
     private fun formatText(text: TextView, window: Window): List<String> {
         val lines = text.getLines()
-        val lastStringIndex = Math.min(lines.size, window.height)
+        val firstStringIndex = Math.max(0, lines.size - window.height)
         val printableLines = lines.
-                slice(0 until lastStringIndex).  //  Get the max number of lines that can be displayed in this window
+                slice(firstStringIndex until lines.size).  //  Get the max number of lines that can be displayed in this window
                 map {
                     val slice = it.visibleCharSlice(0 until window.width)   // slice the line until it fits in the width
                     val padded = slice.visibleCharPadEnd(window.width, ' ')  // but pad it with spaces to clear out any old text
@@ -56,9 +57,7 @@ class WindowManager {
                 }
 
         val numBlankLines = window.height - printableLines.size
-        val finalLinesToPrint = printableLines + (0..numBlankLines).map { " ".repeat(window.width) }
-        return finalLinesToPrint
-    }
 
-    private fun printAtXY(x: Int, y: Int, s: String) = print("\u001B[${y};${x}H$s")
+        return printableLines + (0 until numBlankLines).map { " ".repeat(window.width) }
+    }
 }

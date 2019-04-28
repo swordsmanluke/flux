@@ -7,11 +7,11 @@ import com.ue.wearable_hud.flux.window.*
 import java.io.File
 import kotlinx.coroutines.*
 
-val ESC = "\u001B" // Used in our printer codes
-
 fun main(args: Array<String>) {
     // Raspi view size: 84 col x 22 lines
-    val wm = WindowManager()
+    val console = VT100Console()
+    val wm = WindowManager(console)
+
     val viewForWindow = mutableMapOf<Window, TextView>()
     val taskForWindow = mutableMapOf<Window, Task>()
     val tasks = mutableListOf<Task>()
@@ -49,14 +49,11 @@ fun main(args: Array<String>) {
     taskForWindow[timeWindow] = time
     taskForWindow[mainWindow] = todoList
 
-    showCursor(false)
-
     val prog = Flux(wm, viewForWindow, taskForWindow, tasks, mainWindow.handle)
 
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
             println("\nShutdown")
-            showCursor(true)
             // TODO: Add shutdown code here
         }
     })
@@ -104,13 +101,4 @@ private fun getTerminalDimensions(): Pair<Int, Int> {
     val lineStr = System.getenv("LINES") ?: "80"
     val colStr = System.getenv("COLUMNS") ?: "240"
     return Pair(lineStr.toInt(), colStr.toInt())
-}
-
-fun showCursor(show: Boolean)  {
-    if (show) {
-        print("$ESC[25h")
-    }
-    else {
-        print("$ESC[25l")
-    }
 }

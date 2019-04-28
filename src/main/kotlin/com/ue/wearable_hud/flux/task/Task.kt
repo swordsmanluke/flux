@@ -51,7 +51,13 @@ class UnixTask(val workingDir: File, val command: String, val refreshPeriodSec: 
             proc.waitFor(60, TimeUnit.MINUTES)
             val text = proc.inputStream.bufferedReader().readText()
             lastRun = System.currentTimeMillis()
-            lines = text.split("\n")
+            var lines = text.split("\n")
+
+            if (lines.last() == "") {
+                lines = lines.slice(0 until (lines.count() - 1))
+            }
+
+            this.lines = lines
             return lines
         } catch (e: IOException) {
             e.printStackTrace()
