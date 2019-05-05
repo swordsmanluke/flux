@@ -5,13 +5,14 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 interface Task {
+    val id: String
     fun nextRunAt(): Long
     fun readyToSchedule(): Boolean
     fun getLines(): Collection<String>
     suspend fun run(): Collection<String>
 }
 
-class StaticTask(var strings: Collection<String>): Task {
+class StaticTask(override val id: String, var strings: Collection<String>): Task {
     fun update(newStrings: Collection<String>) {
         strings = newStrings
     }
@@ -22,8 +23,7 @@ class StaticTask(var strings: Collection<String>): Task {
     override suspend fun run(): Collection<String> = strings
 }
 
-class UnixTask(val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
-
+class UnixTask(override val id: String, val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
     private var lines: Collection<String> = emptyList()
     private var lastRun = 0L
 
@@ -67,6 +67,7 @@ class UnixTask(val workingDir: File, val command: String, val refreshPeriodSec: 
 }
 
 class NullTask : Task {
+    override val id = "nulltask"
     override fun nextRunAt(): Long = Long.MAX_VALUE // Never needs to be scheduled
     override fun readyToSchedule(): Boolean = false // Never needs to be run
     override fun getLines(): Collection<String> = emptyList()

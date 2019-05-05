@@ -8,12 +8,21 @@ class WindowManager(val console: Console) {
     private var nextHandle = 1
     private val _windows = mutableListOf<Window>()
     private val viewLastUpdated = mutableMapOf<TextView, Long>()
+    private var maxWindow: Window? = null
+    val mainWindow: Window
+        get() {
+            if (maxWindow == null) {
+                maxWindow = _windows.maxBy { it.width * it.height }
+            }
+            return maxWindow ?: NullWindow()
+        }
 
     fun createNewWindow(xPos: Int, yPos: Int, width: Int, height: Int): Window {
         val w = Window(nextHandle++, xPos, yPos, width, height)
         validateDoesNotOverlap(w)
         // TODO: Bounds check against terminal size
         _windows.add(w)
+        maxWindow = null // Clear max until we need it again
         return w
     }
 
