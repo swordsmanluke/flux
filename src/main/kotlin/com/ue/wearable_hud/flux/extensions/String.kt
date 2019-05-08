@@ -50,6 +50,12 @@ fun String.visibleCharSlice(indices: IntRange): String {
         endSliceIndex = this.length - 1
     }
 
+    if (startSliceIndex < 0) {
+        // Started with a single match, but did not continue
+        startSliceIndex = (prevMatch?.range?.endInclusive ?: -1) + 1
+        leadingVT100Code = prevMatch?.value ?: ""
+    }
+
     val trailingVT100Sequence = if (endSliceIndex >= this.length - 1) {
         ""
     } else {

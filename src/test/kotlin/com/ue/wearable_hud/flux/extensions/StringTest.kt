@@ -49,6 +49,12 @@ class StringTest {
         assertThat(sliced, `is`(PLAIN_TEST.slice(2..3)))
     }
 
+    @Test
+    fun slicingBuggyColoredString() {
+        val sliced = "\u001B[38;5;1m\u001B[1mContinuous Deployment discussion cont.               11:00".visibleCharSlice(0..74)
+        assertThat(sliced, `is`("\u001B[38;5;1m\u001B[1mContinuous Deployment discussion cont.               11:00"))
+    }
+
     // Padding End of strings
 
     @Test
