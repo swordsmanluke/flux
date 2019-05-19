@@ -1,5 +1,10 @@
 package com.ue.wearable_hud.flux.window
 
+import com.googlecode.lanterna.TextCharacter
+import com.googlecode.lanterna.terminal.DefaultTerminalFactory
+
+
+
 interface Console {
     fun clearScreen()
     fun printAtXY(x: Int, y: Int, s: String)
@@ -24,5 +29,26 @@ class VT100Console:Console {
         else {
             print("$ESC[25l")
         }
+    }
+}
+
+class LanternaConsole:Console {
+    val defaultTerminalFactory = DefaultTerminalFactory()
+    val screen = defaultTerminalFactory.createScreen()
+
+    init {
+        screen.startScreen()
+    }
+
+    override fun clearScreen() {
+        screen.clear()
+        screen.refresh()
+    }
+
+    override fun printAtXY(x: Int, y: Int, s: String) {
+        // TODO: Doesn't work with control characters, e.g. VT100 codes
+        val tg = screen.newTextGraphics()
+        tg.putString(x, y, s)
+        screen.refresh()
     }
 }
