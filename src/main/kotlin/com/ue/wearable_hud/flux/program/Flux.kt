@@ -3,14 +3,12 @@ package com.ue.wearable_hud.flux.program
 import com.ue.wearable_hud.flux.task.NullTask
 import com.ue.wearable_hud.flux.task.StaticTask
 import com.ue.wearable_hud.flux.window.*
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 
 class Flux(val context: FluxConfiguration) {
 
     val errTask = StaticTask("errors", emptyList()) // Task for displaying errors
+
     init {
         context.tasks.add(errTask)
     }
@@ -26,11 +24,12 @@ class Flux(val context: FluxConfiguration) {
         }
     }
 
+    @UseExperimental(ObsoleteCoroutinesApi::class)
     private suspend fun runRefreshTaskLoop() {
         do {
             try {
                 coroutineScope {
-                    context.tasks.filter { it.readyToSchedule() }.forEach { async { it.run() } }
+                    context.tasks.filter { it.readyToSchedule() }.forEach { launch(newSingleThreadContext(it.id)) { it.run() } }
                 }
             } catch (e: Exception) {
                 displayErrorInMain(e)
