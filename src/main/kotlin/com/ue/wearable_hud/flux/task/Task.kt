@@ -1,8 +1,12 @@
 package com.ue.wearable_hud.flux.task
 
+import kotlinx.coroutines.delay
+import mu.KotlinLogging
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+
+private val logger = KotlinLogging.logger {}
 
 interface Task {
     val id: String
@@ -13,6 +17,10 @@ interface Task {
 }
 
 class StaticTask(override val id: String, var strings: Collection<String>): Task {
+    init {
+        logger.info { "Creating new StaticTask for task $id" }
+    }
+
     fun update(newStrings: Collection<String>) {
         strings = newStrings
     }
@@ -27,6 +35,10 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     private var lines: Collection<String> = emptyList()
     private var lastRun = 0L
 
+    init {
+        logger.info { "Creating new UnixTask for task $id. Command: '${workingDir}/$command' Refresh: ${refreshPeriodSec}s" }
+    }
+
     override fun nextRunAt(): Long {
         return lastRun + refreshPeriodSec * 1000
     }
@@ -40,6 +52,7 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     override suspend fun run(): Collection<String> {
+        logger.info("UnixTask ${id} running command '$command'")
         try {
             val parts = command.split("\\s".toRegex())
             val proc = ProcessBuilder(*parts.toTypedArray())
@@ -67,6 +80,10 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
 }
 
 class NullTask : Task {
+    init {
+        logger.info { "Creating new NullTask" }
+    }
+
     override val id = "nulltask"
     override fun nextRunAt(): Long = Long.MAX_VALUE // Never needs to be scheduled
     override fun readyToSchedule(): Boolean = false // Never needs to be run

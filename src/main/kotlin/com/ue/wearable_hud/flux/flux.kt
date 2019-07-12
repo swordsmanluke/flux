@@ -8,12 +8,13 @@ import com.ue.wearable_hud.flux.task.UnixTask
 import com.ue.wearable_hud.flux.window.*
 import java.io.File
 import kotlinx.coroutines.*
+import mu.KotlinLogging
 import net.consensys.cava.toml.Toml
 import net.consensys.cava.toml.TomlTable
 import java.lang.IllegalArgumentException
 import java.nio.file.Paths
 
-
+private val logger = KotlinLogging.logger {}
 fun main(args: Array<String>) {
     // Raspi view size: 84 col x 22 lines
     val console = VT100Console()
@@ -25,12 +26,16 @@ fun main(args: Array<String>) {
 
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
+            logger.info("Shutdown")
             println("\nShutdown")
-            // TODO: Add shutdown code here
         }
     })
 
-    runBlocking { prog.run() }
+    try {
+        runBlocking { prog.run() }
+    } catch (e: Exception) {
+        logger.error(e) { "FATAL: An unhandled exception has killed Flux!" }
+    }
 }
 
 private fun loadConfiguration(wm: WindowManager): FluxConfiguration {
@@ -53,6 +58,7 @@ private fun loadConfiguration(wm: WindowManager): FluxConfiguration {
         val (window, task, view) = constructWindow(wm, windowConfig, tasks)
         viewForWindow[window] = view
         taskForWindow[window] = task
+        logger.info("Associating task ${task.id} -> window ${window.handle}")
     }
 
     return FluxConfiguration(wm, viewForWindow, taskForWindow, tasks)

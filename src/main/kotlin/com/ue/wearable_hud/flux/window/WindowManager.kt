@@ -2,6 +2,9 @@ package com.ue.wearable_hud.flux.window
 
 import com.ue.wearable_hud.flux.extensions.visibleCharPadEnd
 import com.ue.wearable_hud.flux.extensions.visibleCharSlice
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 class WindowManager(val console: Console) {
 
@@ -19,7 +22,11 @@ class WindowManager(val console: Console) {
 
     fun createNewWindow(xPos: Int, yPos: Int, width: Int, height: Int): Window {
         val w = Window(nextHandle++, xPos, yPos, width, height)
+
+        logger.info("Creating window #$nextHandle [$width X $height] @ ($xPos,$yPos)")
+
         validateDoesNotOverlap(w)
+
         // TODO: Bounds check against terminal size
         _windows.add(w)
         maxWindow = null // Clear max until we need it again
@@ -33,6 +40,7 @@ class WindowManager(val console: Console) {
         // TODO: Probably want to get rid of this constraint.
         // TODO: It could make sense for us to have modal windows, for instance.
         if (_windows.any { it.overlaps(w) }) {
+            logger.warn("Window $w would overlap existing windows!")
             throw IllegalArgumentException("Window $w would overlap existing windows!")
         }
     }
@@ -49,6 +57,7 @@ class WindowManager(val console: Console) {
     }
 
     private fun printFormattedLines(finalLinesToPrint: List<String>, window: Window) {
+        logger.info("Printing ${finalLinesToPrint.size} lines to window ${window.handle}")
         finalLinesToPrint.forEachIndexed { i, line ->
             console.printAtXY(window.x, window.y + i, line)
         }
