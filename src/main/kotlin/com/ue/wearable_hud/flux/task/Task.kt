@@ -55,22 +55,29 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
         logger.info("UnixTask ${id} running command '$command'")
         try {
             val parts = command.split("\\s".toRegex())
-            val proc = ProcessBuilder(*parts.toTypedArray())
-                    .directory(workingDir)
-                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                    .redirectError(ProcessBuilder.Redirect.PIPE)
-                    .start()
+            var text = ""
 
-            proc.waitFor(60, TimeUnit.MINUTES)
-            val text = proc.inputStream.bufferedReader().readText()
-            lastRun = System.currentTimeMillis()
-            var lines = text.split("\n")
+            val backgroundTask = Thread {
+                val proc = ProcessBuilder(*parts.toTypedArray())
+                        .directory(workingDir)
+                        .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                        .redirectError(ProcessBuilder.Redirect.PIPE)
+                        .start()
 
-            if (lines.last() == "") {
-                lines = lines.slice(0 until (lines.count() - 1))
+                proc.waitFor(60, TimeUnit.MINUTES)
+                text = proc.inputStream.bufferedReader().readText()
             }
 
-            this.lines = lines
+            backgroundTask.start()
+
+            while(backgroundTask.isAlive) { delay(100) }
+
+            lastRun = System.currentTimeMillis()
+
+            val lines = text.split("\n")
+            val lastLine = if (lines.last() == "") lines.count() - 1 else lines.count() // Strip out an empty last line
+            this.lines = lines.slice(0 until lastLine)
+
             return lines
         } catch (e: IOException) {
             e.printStackTrace()
