@@ -57,7 +57,7 @@ class WindowManager(val console: Console) {
     }
 
     private fun printFormattedLines(finalLinesToPrint: List<String>, window: Window) {
-        logger.info("Printing ${finalLinesToPrint.size} lines to window ${window.handle}")
+        logger.debug{ "Printing ${finalLinesToPrint.size} lines to window ${window.handle}" }
         finalLinesToPrint.forEachIndexed { i, line ->
             console.printAtXY(window.x, window.y + i, line)
         }

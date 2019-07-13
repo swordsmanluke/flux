@@ -58,7 +58,7 @@ class Flux(val context: FluxConfiguration) {
                 logger.error(e) { "Unhandled exception updating UI!" }
                 displayErrorInMain(e)
             }
-            delay(1000) // Sleep 1 second between UI refreshes
+            delay(10) // Sleep .1 second between UI refreshes
         } while (true)
     }
 

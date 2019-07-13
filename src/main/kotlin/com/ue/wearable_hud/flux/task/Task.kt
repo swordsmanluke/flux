@@ -5,6 +5,7 @@ import mu.KotlinLogging
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 private val logger = KotlinLogging.logger {}
 
@@ -40,7 +41,11 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     override fun nextRunAt(): Long {
-        return lastRun + refreshPeriodSec * 1000
+        val nextRefresh = refreshPeriodSec * 1000
+//        val negativeJitterOffset = -(nextRefresh*0.05).toInt()
+        // Add +-5 % jitter to avoid same-time refreshes
+//        val jitter = Random.nextInt(negativeJitterOffset, (nextRefresh*0.1).toInt())
+        return lastRun + nextRefresh
     }
 
     override fun readyToSchedule(): Boolean {
@@ -52,18 +57,26 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     override suspend fun run(): Collection<String> {
-        logger.info("UnixTask ${id} running command '$command'")
+        logger.debug { "UnixTask ${id} running command '$command'" }
         try {
             val parts = command.split("\\s".toRegex())
-            val proc = ProcessBuilder(*parts.toTypedArray())
-                    .directory(workingDir)
-                    .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                    .redirectError(ProcessBuilder.Redirect.PIPE)
-                    .start()
+            var text = ""
+            val backgroundRunner = Thread {
 
-            proc.waitFor(1, TimeUnit.MINUTES)
-            
-            val text = proc.inputStream.bufferedReader().readText()
+                val proc = ProcessBuilder(*parts.toTypedArray())
+                        .directory(workingDir)
+                        .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                        .redirectError(ProcessBuilder.Redirect.PIPE)
+                        .start()
+
+                proc.waitFor(1, TimeUnit.MINUTES)
+
+                text = proc.inputStream.bufferedReader().readText()
+            }
+
+            backgroundRunner.start()
+
+            while(backgroundRunner.isAlive) { delay(100) }
 
             lastRun = System.currentTimeMillis()
 
