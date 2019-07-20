@@ -5,10 +5,13 @@ import com.ue.wearable_hud.flux.task.StaticTask
 import com.ue.wearable_hud.flux.window.*
 import kotlinx.coroutines.*
 import mu.KotlinLogging
+import java.util.concurrent.Executors
+import kotlin.system.measureTimeMillis
 
 private val logger = KotlinLogging.logger {}
 class Flux(val context: FluxConfiguration) {
 
+    val taskRunnerCtx = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
     val errTask = StaticTask("errors", emptyList()) // Task for displaying errors
 
     init {
@@ -26,39 +29,51 @@ class Flux(val context: FluxConfiguration) {
         }
     }
 
-    @UseExperimental(ObsoleteCoroutinesApi::class)
     private suspend fun runRefreshTaskLoop() {
         logger.info("=== Beginning Refresh Task Loop ===")
         logger.info("Refreshing ${context.tasks.count()} tasks")
         do {
             try {
                 coroutineScope {
-                    context.tasks.filter { it.readyToSchedule() }.forEach { launch(newSingleThreadContext(it.id)) { it.run() } }
+                    context.tasks.filter { it.readyToSchedule() }.forEach {
+                        withContext(taskRunnerCtx) {
+                            launch {
+                                val elapsed = measureTimeMillis { it.run() }
+                                logger.info { "Task ${it.id} ran in ${elapsed / 1000.0}s" }
+                            }
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Unhandled exception running a task!" }
                 displayErrorInMain(e)
             }
             sleepTilNextTask()
-        }while (true)
+        } while (true)
     }
 
     private suspend fun runRefreshUiLoop() {
         logger.info("=== Beginning Refresh UI Loop ===")
         logger.info("Refreshing ${context.windowManager.windows.count()} windows")
+        val loopDelayMillis = 1000L
         do {
-            try {
-                context.windowManager.windows.forEach { window ->
-                    val task =  context.taskForWindow[window] ?: NullTask()
-                    val view =  context.viewForWindow[window] ?: NullView()
-                    view.replaceLines(task.getLines())
-                    context.windowManager.displayText(window.handle, view)
+            val elapsed = measureTimeMillis {
+                try {
+                    context.windowManager.windows.forEach { window ->
+                        val task = context.taskForWindow[window] ?: NullTask()
+                        val view = context.viewForWindow[window] ?: NullView()
+                        view.replaceLines(task.getLines())
+                        context.windowManager.displayText(window.handle, view)
+                    }
+                } catch (e: Exception) {
+                    logger.error(e) { "Unhandled exception updating UI!" }
+                    displayErrorInMain(e)
                 }
-            } catch (e: Exception) {
-                logger.error(e) { "Unhandled exception updating UI!" }
-                displayErrorInMain(e)
+                delay(loopDelayMillis) // Sleep .1 second between UI refreshes
             }
-            delay(10) // Sleep .1 second between UI refreshes
+
+            if (elapsed > 2 * loopDelayMillis) { logger.warn{ "UI loop update took ${(elapsed/1000.0)}s" } }
+
         } while (true)
     }
 
