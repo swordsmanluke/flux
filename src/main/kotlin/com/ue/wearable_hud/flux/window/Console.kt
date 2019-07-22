@@ -105,7 +105,7 @@ class LanternaConsole:Console {
             when(cmd) {
                 is PrintString -> { tg.putString(start, y, cmd.text); start += cmd.text.length }
                 is SetTextColor -> { setTextStyle(tg, cmd) }
-                else -> {} // TODO: Log the unsupported command?
+                else -> { throw NotImplementedError("Command ${cmd.javaClass.simpleName} not handled!") }
             }
         }
 
@@ -115,6 +115,8 @@ class LanternaConsole:Console {
     private fun setTextStyle(tg: TextGraphics, cmd: SetTextColor) {
         val modifiersToAdd = mutableListOf<SGR>()
         val modifiersToRemove = mutableListOf<SGR>()
+
+        // FIXME: Resetting to default colors isn't working
 
         if (cmd.blink != null) if (cmd.blink) modifiersToAdd.add(SGR.BLINK) else modifiersToRemove.add(SGR.BLINK)
         if (cmd.bold != null) if (cmd.bold) modifiersToAdd.add(SGR.BOLD) else modifiersToRemove.add(SGR.BOLD)
