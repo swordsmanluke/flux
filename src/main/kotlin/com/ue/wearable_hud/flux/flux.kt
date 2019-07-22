@@ -17,7 +17,7 @@ import java.nio.file.Paths
 private val logger = KotlinLogging.logger {}
 fun main(args: Array<String>) {
     // Raspi view size: 84 col x 22 lines
-    val console = VT100Console()
+    val console = LanternaConsole()
     val wm = WindowManager(console)
 
     val config = loadConfiguration(wm)
@@ -33,6 +33,8 @@ fun main(args: Array<String>) {
 
     try {
         runBlocking { prog.run() }
+        logger.info("Shutdown")
+        println("\nShutdown")
     } catch (e: Exception) {
         logger.error(e) { "FATAL: An unhandled exception has killed Flux!" }
     }

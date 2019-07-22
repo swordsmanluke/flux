@@ -13,6 +13,7 @@ class Flux(val context: FluxConfiguration) {
 
     val taskRunnerCtx = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
     val errTask = StaticTask("errors", emptyList()) // Task for displaying errors
+    var shouldExit = false
 
     init {
         context.tasks.add(errTask)
@@ -22,11 +23,36 @@ class Flux(val context: FluxConfiguration) {
         context.windowManager.console.clearScreen()
 
         coroutineScope{
-            val j1 = async { runRefreshTaskLoop() }
-            val j2 = async { runRefreshUiLoop() }
+            val jobs = mutableListOf(
+                    async { runRefreshTaskLoop() },
+                    async { runRefreshUiLoop() }
+            )
 
-            awaitAll(j1, j2)
+            if (context.windowManager.console is LanternaConsole) {
+                jobs.add(
+                        async { runInputLoop(context.windowManager.console as LanternaConsole) }
+                )
+            }
+
+            awaitAll(*jobs.toTypedArray())
         }
+    }
+
+    private suspend fun runInputLoop(console: LanternaConsole) {
+        do {
+            try{
+                delay(100)
+                val input = console.screen.terminal.pollInput() ?: continue
+
+                if (input.character.toLowerCase() == 'c' && input.isCtrlDown) {
+                    logger.info { "Caught CTRL-C. Attempting shutdown" }
+                    shouldExit = true
+                }
+            } catch (e: Exception) {
+                logger.error("Unhandled error reading keyboard input", e)
+            }
+        } while(true)
+
     }
 
     private suspend fun runRefreshTaskLoop() {
@@ -49,6 +75,7 @@ class Flux(val context: FluxConfiguration) {
                 displayErrorInMain(e)
             }
             sleepTilNextTask()
+            if (shouldExit) { break }
         } while (true)
     }
 
@@ -74,6 +101,7 @@ class Flux(val context: FluxConfiguration) {
 
             if (elapsed > 2 * loopDelayMillis) { logger.warn{ "UI loop update took ${(elapsed/1000.0)}s" } }
 
+            if (shouldExit) { break }
         } while (true)
     }
 
