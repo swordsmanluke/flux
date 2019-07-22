@@ -47,12 +47,12 @@ class Flux(val context: FluxConfiguration) {
                 if (input.character.toLowerCase() == 'c' && input.isCtrlDown) {
                     logger.info { "Caught CTRL-C. Attempting shutdown" }
                     shouldExit = true
+                    break
                 }
             } catch (e: Exception) {
                 logger.error("Unhandled error reading keyboard input", e)
             }
         } while(true)
-
     }
 
     private suspend fun runRefreshTaskLoop() {
@@ -120,5 +120,4 @@ class Flux(val context: FluxConfiguration) {
         errTask.update(errors.slice(0..lastErrLine))
          context.taskForWindow[context.windowManager.mainWindow] = errTask
     }
-
 }

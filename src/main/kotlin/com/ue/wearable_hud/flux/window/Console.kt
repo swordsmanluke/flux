@@ -88,6 +88,7 @@ class LanternaConsole:Console {
 
     init {
         screen.startScreen()
+        screen.cursorPosition = null
     }
 
     override fun clearScreen() {
