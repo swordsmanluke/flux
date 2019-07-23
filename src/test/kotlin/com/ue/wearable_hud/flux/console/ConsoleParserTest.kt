@@ -1,10 +1,7 @@
 package com.ue.wearable_hud.flux.console
-import com.ue.wearable_hud.flux.task.UnixTask
-import kotlinx.coroutines.runBlocking
-import org.hamcrest.CoreMatchers.*
-import org.junit.Assert.*
+import org.hamcrest.CoreMatchers.`is`
+import org.junit.Assert.assertThat
 import org.junit.Test
-import java.io.File
 
 class ConsoleParserTest {
     val ESC = "\u001B"
