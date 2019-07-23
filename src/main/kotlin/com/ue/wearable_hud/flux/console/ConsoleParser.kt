@@ -6,7 +6,7 @@ interface ConsoleParser {
 
 class VT100ConsoleParser : ConsoleParser {
     val ESC = "\u001B"
-    val vt100EscapeSequences = Regex("(($ESC\\[|\u009b)[\u0030-\u003f]*[\u0020-\u002f]*[\u0040-\u007e])+")
+    val vt100EscapeSequences = Regex("(($ESC\\[|\u009b)[\u0030-\u003f]*[\u0020-\u002f]*[\u0040-\u007e])")
     val colorSequence = Regex("$ESC\\[([0-9;]+)m")
 
     override fun parse(string: String): List<ConsoleCommand> {
@@ -90,8 +90,10 @@ class VT100ConsoleParser : ConsoleParser {
 
                     // 16 Color Terminals
                     in 30..37 -> foreground = colorCode
+                    39 -> foreground = colorCode
                     in 90..97 -> foreground = colorCode
                     in 40..47 -> background = colorCode
+                    49 -> background = colorCode
                     in 100..107 -> background = colorCode
                 }
             }

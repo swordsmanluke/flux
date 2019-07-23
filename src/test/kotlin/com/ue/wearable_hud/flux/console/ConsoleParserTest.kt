@@ -1,7 +1,10 @@
 package com.ue.wearable_hud.flux.console
+import com.ue.wearable_hud.flux.task.UnixTask
+import kotlinx.coroutines.runBlocking
 import org.hamcrest.CoreMatchers.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
 
 class ConsoleParserTest {
     val ESC = "\u001B"
@@ -76,7 +79,7 @@ class ConsoleParserTest {
                 PrintString("Hello "),
                 SetTextColor(colorSet = TextColorMode.COLOR_256, foreground = 24),
                 PrintString(" World!"),
-                SetTextColor()) // 39 = clear foreground color. Not sure how best to represent that...
+                SetTextColor(foreground = 39)) // 39 = clear foreground color. Not sure how best to represent that...
 
         assertThat(commands, `is`(expectedCommands))
     }

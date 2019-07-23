@@ -121,9 +121,14 @@ class LanternaConsole:Console {
         if (cmd.blink != null) if (cmd.blink) modifiersToAdd.add(SGR.BLINK) else modifiersToRemove.add(SGR.BLINK)
         if (cmd.bold != null) if (cmd.bold) modifiersToAdd.add(SGR.BOLD) else modifiersToRemove.add(SGR.BOLD)
 
-        // "Bright" colors are represented by "BOLD" in Lanterna
-        if (cmd.background != null) { tg.backgroundColor = getBackgroundColor(cmd); if (cmd.background >= 100) modifiersToAdd.add(SGR.BOLD) }
-        if (cmd.foreground != null) { tg.foregroundColor = getForegroundColor(cmd); if (cmd.foreground >= 90)  modifiersToAdd.add(SGR.BOLD) }
+        if (cmd.colorSet == TextColorMode.COLOR_16) {
+            // "Bright" 16-color-mode colors are represented by "BOLD" in Lanterna
+            if (cmd.background ?: 0 >= 100) modifiersToAdd.add(SGR.BOLD) else if(cmd.background ?: 0 > 40) modifiersToRemove.add(SGR.BOLD)
+            if (cmd.foreground ?: 0 >= 90)  modifiersToAdd.add(SGR.BOLD) else if(cmd.foreground ?: 0 > 30) modifiersToRemove.add(SGR.BOLD)
+        }
+
+        if (cmd.background != null) tg.backgroundColor = getBackgroundColor(cmd)
+        if (cmd.foreground != null) tg.foregroundColor = getForegroundColor(cmd)
 
         if (modifiersToAdd.size > 0) { tg.setModifiers(EnumSet.copyOf(modifiersToAdd)) }
         if (modifiersToRemove.size > 0) { tg.disableModifiers(*modifiersToRemove.toTypedArray()) }
