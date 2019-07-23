@@ -1,5 +1,6 @@
 build/
 flux-0.1/
+flux-0.2/
 .gradle
 out
 config/tasks.toml
