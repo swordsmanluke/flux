@@ -35,6 +35,7 @@ class StaticTask(override val id: String, var strings: Collection<String>): Task
 class UnixTask(override val id: String, val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
     private var lines: Collection<String> = emptyList()
     private var lastRun = 0L
+    private var running = false
 
     init {
         logger.info { "Creating new UnixTask for task $id. Command: '${workingDir}/$command' Refresh: ${refreshPeriodSec}s" }
@@ -49,7 +50,7 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     override fun readyToSchedule(): Boolean {
-        return System.currentTimeMillis() > nextRunAt()
+        return !running && System.currentTimeMillis() > nextRunAt()
     }
 
     override fun getLines(): Collection<String> {
@@ -57,7 +58,7 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     override suspend fun run(): Collection<String> {
-        logger.debug { "UnixTask ${id} running command '$command'" }
+        running = true
         try {
             val parts = command.split("\\s".toRegex())
             var text = ""
@@ -86,8 +87,10 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
 
             return lines
         } catch (e: IOException) {
-            e.printStackTrace()
+            logger.error("Unhandled exception running UnixTask", e)
             return emptyList()
+        } finally {
+            running = false
         }
     }
 }

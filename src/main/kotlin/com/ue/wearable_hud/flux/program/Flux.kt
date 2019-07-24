@@ -9,6 +9,7 @@ import java.util.concurrent.Executors
 import kotlin.system.measureTimeMillis
 
 private val logger = KotlinLogging.logger {}
+
 class Flux(val context: FluxConfiguration) {
 
     val taskRunnerCtx = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
@@ -22,7 +23,7 @@ class Flux(val context: FluxConfiguration) {
     suspend fun run() {
         context.windowManager.console.clearScreen()
 
-        coroutineScope{
+        coroutineScope {
             val jobs = mutableListOf(
                     async { runRefreshTaskLoop() },
                     async { runRefreshUiLoop() }
@@ -30,7 +31,7 @@ class Flux(val context: FluxConfiguration) {
 
             if (context.windowManager.console is LanternaConsole) {
                 jobs.add(
-                        async { runInputLoop(context.windowManager.console as LanternaConsole) }
+                        async { runInputLoop(context.windowManager.console) }
                 )
             }
 
@@ -40,11 +41,11 @@ class Flux(val context: FluxConfiguration) {
 
     private suspend fun runInputLoop(console: LanternaConsole) {
         do {
-            try{
+            try {
                 delay(100)
                 val input = console.screen.terminal.pollInput() ?: continue
 
-                if (input.character.toLowerCase() == 'c' && input.isCtrlDown) {
+                if (input.isCtrlDown && input.character.toLowerCase() == 'c') {
                     logger.info { "Caught CTRL-C. Attempting shutdown" }
                     shouldExit = true
                     break
@@ -52,7 +53,7 @@ class Flux(val context: FluxConfiguration) {
             } catch (e: Exception) {
                 logger.error("Unhandled error reading keyboard input", e)
             }
-        } while(true)
+        } while (true)
     }
 
     private suspend fun runRefreshTaskLoop() {
@@ -60,23 +61,28 @@ class Flux(val context: FluxConfiguration) {
         logger.info("Refreshing ${context.tasks.count()} tasks")
         do {
             try {
-                coroutineScope {
-                    context.tasks.filter { it.readyToSchedule() }.forEach {
-                        withContext(taskRunnerCtx) {
-                            launch {
-                                val elapsed = measureTimeMillis { it.run() }
-                                logger.info { "Task ${it.id} ran in ${elapsed / 1000.0}s" }
-                            }
-                        }
-                    }
-                }
+                runScheduledTasks()
             } catch (e: Exception) {
                 logger.error(e) { "Unhandled exception running a task!" }
                 displayErrorInMain(e)
             }
             sleepTilNextTask()
-            if (shouldExit) { break }
+            if (shouldExit) {
+                break
+            }
         } while (true)
+    }
+
+    private suspend fun runScheduledTasks() {
+        withContext(taskRunnerCtx) {
+            for (task in context.tasks) {
+                if (!task.readyToSchedule()) continue
+                launch {
+                    val elapsed = measureTimeMillis { task.run() }
+                    logger.info { "Task ${task.id} ran in ${elapsed / 1000.0}s" }
+                }
+            }
+        }
     }
 
     private suspend fun runRefreshUiLoop() {
@@ -96,18 +102,22 @@ class Flux(val context: FluxConfiguration) {
                     logger.error(e) { "Unhandled exception updating UI!" }
                     displayErrorInMain(e)
                 }
-                delay(loopDelayMillis) // Sleep .1 second between UI refreshes
+                delay(loopDelayMillis) // Sleep between UI refreshes
             }
 
-            if (elapsed > 2 * loopDelayMillis) { logger.warn{ "UI loop update took ${(elapsed/1000.0)}s" } }
+            if (elapsed > 2 * loopDelayMillis) {
+                logger.warn { "UI loop update took ${(elapsed / 1000.0)}s" }
+            }
 
-            if (shouldExit) { break }
+            if (shouldExit) {
+                break
+            }
         } while (true)
     }
 
     private suspend fun sleepTilNextTask() {
         val now = System.currentTimeMillis()
-        val nextRun =  context.tasks.map { it.nextRunAt() }.min() ?: now
+        val nextRun = context.tasks.map { it.nextRunAt() }.min() ?: now
 
         val delta = Math.max(1000, nextRun - System.currentTimeMillis())  // Wait at least 1 second between refreshes
         delay(delta)
@@ -118,6 +128,6 @@ class Flux(val context: FluxConfiguration) {
         // Truncate the stack trace to fit in the window. Extra lines will push down the output
         val lastErrLine = Math.min(errors.count(), context.windowManager.mainWindow.height)
         errTask.update(errors.slice(0..lastErrLine))
-         context.taskForWindow[context.windowManager.mainWindow] = errTask
+        context.taskForWindow[context.windowManager.mainWindow] = errTask
     }
 }
