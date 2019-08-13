@@ -1,6 +1,7 @@
 package com.ue.wearable_hud.flux.window
 
 import com.ue.wearable_hud.flux.extensions.visibleCharSlice
+import kotlin.math.max
 
 interface TextView {
     var storedLines: MutableList<String>
@@ -62,8 +63,8 @@ class ScrollableTextView(val width: Int, val height: Int):TextView {
 
         val maxLength = storedLines.maxBy { it.length }?.length ?: 0
 
-        offsetX = stayWithinBounds(offsetX, 0, Math.max(0, maxLength - width))
-        offsetY = stayWithinBounds(offsetY, 0, Math.max(0, storedLines.size - height))
+        offsetX = stayWithinBounds(offsetX, 0, max(0, maxLength - width))
+        offsetY = stayWithinBounds(offsetY, 0, max(0, storedLines.size - height))
     }
 
     private fun stayWithinBounds(value: Int, min: Int, max: Int): Int {

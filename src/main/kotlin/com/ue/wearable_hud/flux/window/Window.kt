@@ -19,6 +19,12 @@ data class Window(val handle: Int, val x: Int, val y: Int, val width: Int, val h
 
         return true
     }
+
+    fun resize(x: Int, y: Int, width: Int, height: Int): Window {
+        return Window(handle, x, y, width, height)
+    }
 }
 
 fun NullWindow() = Window(0,0,0,0,0)
+
+// TODO: Add Dimensions to handle resizing

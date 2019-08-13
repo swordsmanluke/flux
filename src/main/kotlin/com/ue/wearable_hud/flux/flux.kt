@@ -3,8 +3,10 @@ package com.ue.wearable_hud.flux
 import com.ue.wearable_hud.flux.program.Flux
 import com.ue.wearable_hud.flux.program.FluxConfiguration
 import com.ue.wearable_hud.flux.task.NullTask
+import com.ue.wearable_hud.flux.task.StaticTask
 import com.ue.wearable_hud.flux.task.Task
 import com.ue.wearable_hud.flux.task.UnixTask
+import com.ue.wearable_hud.flux.terminal.Terminal
 import com.ue.wearable_hud.flux.window.*
 import java.io.File
 import kotlinx.coroutines.*
@@ -21,8 +23,8 @@ fun main(args: Array<String>) {
     val wm = WindowManager(console)
 
     val config = loadConfiguration(wm)
-
-    val prog = Flux(config)
+    val terminal = Terminal({ s -> config.getTaskById(s) } ) // lambda to wrap the function refererence in a closure
+    val prog = Flux(config, terminal)
 
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
@@ -41,8 +43,8 @@ fun main(args: Array<String>) {
 }
 
 private fun loadConfiguration(wm: WindowManager): FluxConfiguration {
-    val viewForWindow = mutableMapOf<Window, TextView>()
-    val taskForWindow = mutableMapOf<Window, Task>()
+    val viewForWindow = mutableMapOf<Int, TextView>()
+    val taskForWindow = mutableMapOf<Int, Task>()
 
     val taskConfig = Toml.parse(Paths.get("config/tasks.toml"))
     taskConfig.errors().forEach { error -> System.err.println(error.toString()) }
@@ -55,13 +57,18 @@ private fun loadConfiguration(wm: WindowManager): FluxConfiguration {
 
     val windowDescriptions = taskConfig.getArray("windows")
     val windowCount = windowDescriptions?.size() ?: 0
-    (0 until windowCount).forEach { i->
+    (0 until windowCount).forEach { i ->
         val windowConfig = windowDescriptions?.getTable(i)
         val (window, task, view) = constructWindow(wm, windowConfig, tasks)
-        viewForWindow[window] = view
-        taskForWindow[window] = task
+        viewForWindow[window.handle] = view
+        taskForWindow[window.handle] = task
         logger.info("Associating task ${task.id} -> window ${window.handle}")
     }
+
+    val tw = wm.terminalWindow
+    val termTask = StaticTask("terminal")
+    tasks.add(termTask)
+    taskForWindow[tw.handle] = termTask
 
     return FluxConfiguration(wm, viewForWindow, taskForWindow, tasks)
 }

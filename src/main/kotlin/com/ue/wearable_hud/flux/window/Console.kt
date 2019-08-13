@@ -5,9 +5,11 @@ import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.graphics.TextGraphics
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
 import com.ue.wearable_hud.flux.console.*
-import org.w3c.dom.Text
+import mu.KotlinLogging
 import java.util.*
 import kotlin.collections.HashMap
+
+private val logger = KotlinLogging.logger {}
 
 interface Console {
     fun clearScreen()
@@ -115,8 +117,6 @@ class LanternaConsole:Console {
     private fun setTextStyle(tg: TextGraphics, cmd: SetTextColor) {
         val modifiersToAdd = mutableListOf<SGR>()
         val modifiersToRemove = mutableListOf<SGR>()
-
-        // FIXME: Resetting to default colors isn't working
 
         if (cmd.blink != null) if (cmd.blink) modifiersToAdd.add(SGR.BLINK) else modifiersToRemove.add(SGR.BLINK)
         if (cmd.bold != null) if (cmd.bold) modifiersToAdd.add(SGR.BOLD) else modifiersToRemove.add(SGR.BOLD)

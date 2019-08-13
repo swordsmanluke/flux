@@ -1,23 +1,28 @@
 package com.ue.wearable_hud.flux.program
 
-import com.ue.wearable_hud.flux.task.NullTask
+import com.googlecode.lanterna.input.KeyType
 import com.ue.wearable_hud.flux.task.StaticTask
+import com.ue.wearable_hud.flux.terminal.KeyModifier
+import com.ue.wearable_hud.flux.terminal.Terminal
+import com.ue.wearable_hud.flux.terminal.TerminalKey
 import com.ue.wearable_hud.flux.window.*
 import kotlinx.coroutines.*
 import mu.KotlinLogging
 import java.util.concurrent.Executors
+import kotlin.math.max
 import kotlin.system.measureTimeMillis
 
 private val logger = KotlinLogging.logger {}
 
-class Flux(val context: FluxConfiguration) {
+class Flux(val context: FluxConfiguration, val terminal: Terminal) {
 
     val taskRunnerCtx = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
     val errTask = StaticTask("errors", emptyList()) // Task for displaying errors
     var shouldExit = false
+    var mainWindowBottom = context.windowManager.mainWindow.maxY
 
     init {
-        context.tasks.add(errTask)
+        context.addTask(errTask)
     }
 
     suspend fun run() {
@@ -49,6 +54,45 @@ class Flux(val context: FluxConfiguration) {
                     logger.info { "Caught CTRL-C. Attempting shutdown" }
                     shouldExit = true
                     break
+                } else {
+                    val c = if (input.isShiftDown) input.character?.toUpperCase() else input.character
+
+                    val modifiers = mutableListOf<KeyModifier>()
+
+                    if (input.isAltDown) modifiers.add(KeyModifier.ALT)
+                    if (input.isCtrlDown) modifiers.add(KeyModifier.CTRL)
+
+                    val key = when (input.keyType) {
+                        KeyType.Escape -> TerminalKey.ESC
+                        KeyType.Delete -> TerminalKey.DELETE
+                        KeyType.Backspace -> TerminalKey.BACKSPACE
+                        KeyType.Enter -> TerminalKey.ENTER
+//                        KeyType.ArrowLeft -> TODO()
+//                        KeyType.ArrowRight -> TODO()
+//                        KeyType.ArrowUp -> TODO()
+//                        KeyType.ArrowDown -> TODO()
+//                        KeyType.Home -> TODO()
+//                        KeyType.End -> TODO()
+//                        KeyType.Tab -> TODO()
+//                        KeyType.ReverseTab -> TODO()
+                        else -> null
+                    }
+
+                    terminal.sendCharacter(c, key, modifiers)
+                    adjustBottomOfMainWindow()
+
+                    val terminalTask = context.getTask(context.windowManager.terminalWindow) as StaticTask
+                    val terminalView = context.getView(context.windowManager.terminalWindow)
+
+                    if (terminal.commandString.isNotEmpty()) {
+                        val formattedCommand = "> ${terminal.commandString}"
+                        terminalTask.update(listOf(formattedCommand))
+                    } else {
+                        terminalTask.update(listOf())
+                    }
+
+                    terminalView.replaceLines(terminalTask.getLines())
+                    refreshUI()
                 }
             } catch (e: Exception) {
                 logger.error("Unhandled error reading keyboard input", e)
@@ -56,9 +100,31 @@ class Flux(val context: FluxConfiguration) {
         } while (true)
     }
 
+    private fun adjustBottomOfMainWindow() {
+        val mainWindow = context.windowManager.mainWindow
+        val terminalWindow = context.windowManager.terminalWindow
+        val mainWindowTooSmall = mainWindow.maxY < mainWindowBottom
+        val mainWindowFullSize = !mainWindowTooSmall
+        val commandPresent = terminal.commandString.isNotEmpty()
+
+        when (commandPresent) {
+            true  -> if(mainWindowFullSize) {
+                logger.info("Detected new command - shrinking main window")
+                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height - 1)
+                context.windowManager.resizeWindow(terminalWindow.handle, x=mainWindow.x, y=mainWindow.maxY - 1, width=mainWindow.width, height=1)
+                refreshUI()
+            }
+            false -> if(mainWindowTooSmall) {
+                logger.info("Detected command cleared - restoring main window")
+                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height + 1)
+                context.windowManager.resizeWindow(terminalWindow.handle, x=0, y=0, width=0, height=0)
+                refreshUI()
+            }
+        }
+    }
+
     private suspend fun runRefreshTaskLoop() {
         logger.info("=== Beginning Refresh Task Loop ===")
-        logger.info("Refreshing ${context.tasks.count()} tasks")
         do {
             try {
                 runScheduledTasks()
@@ -91,17 +157,7 @@ class Flux(val context: FluxConfiguration) {
         val loopDelayMillis = 1000L
         do {
             val elapsed = measureTimeMillis {
-                try {
-                    context.windowManager.windows.forEach { window ->
-                        val task = context.taskForWindow[window] ?: NullTask()
-                        val view = context.viewForWindow[window] ?: NullView()
-                        view.replaceLines(task.getLines())
-                        context.windowManager.displayText(window.handle, view)
-                    }
-                } catch (e: Exception) {
-                    logger.error(e) { "Unhandled exception updating UI!" }
-                    displayErrorInMain(e)
-                }
+                refreshUI()
                 delay(loopDelayMillis) // Sleep between UI refreshes
             }
 
@@ -115,11 +171,25 @@ class Flux(val context: FluxConfiguration) {
         } while (true)
     }
 
+    private fun refreshUI() {
+        try {
+            context.windowManager.windows.forEach { window ->
+                val task = context.getTask(window)
+                val view = context.getView(window)
+                view.replaceLines(task.getLines())
+                context.windowManager.displayText(window.handle, view)
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Unhandled exception updating UI!" }
+            displayErrorInMain(e)
+        }
+    }
+
     private suspend fun sleepTilNextTask() {
         val now = System.currentTimeMillis()
         val nextRun = context.tasks.map { it.nextRunAt() }.min() ?: now
 
-        val delta = Math.max(1000, nextRun - System.currentTimeMillis())  // Wait at least 1 second between refreshes
+        val delta = max(100, nextRun - System.currentTimeMillis())  // Wait at least .1 second between refreshes
         delay(delta)
     }
 
@@ -128,6 +198,6 @@ class Flux(val context: FluxConfiguration) {
         // Truncate the stack trace to fit in the window. Extra lines will push down the output
         val lastErrLine = Math.min(errors.count(), context.windowManager.mainWindow.height)
         errTask.update(errors.slice(0..lastErrLine))
-        context.taskForWindow[context.windowManager.mainWindow] = errTask
+        context.setTask(context.windowManager.mainWindow, errTask)
     }
 }
