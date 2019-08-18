@@ -70,6 +70,28 @@ fun String.visibleCharPadEnd(length: Int, padChar: Char = ' '): String {
     return this.padEnd(this.length + padLength, padChar)
 }
 
+fun String.stripVT100Sequences(): String {
+    val matches = vt100EscapeSequences.findAll(this)
+
+    // Find where to slice, ignoring unprintable VT100 escape sequences
+    var startIndex = 0
+    val sb = StringBuilder()
+    matches.forEach { match ->
+        val endIndex = match.range.start
+        val section = this.slice(startIndex until endIndex)
+        startIndex = match.range.endInclusive + 1
+
+        sb.append(section)
+    }
+
+    if (startIndex < this.length) {
+        // Grab remainder of string
+        sb.append(this.slice(startIndex until this.length))
+    }
+
+    return sb.toString()
+}
+
 private fun String.visibleCharLength(): Int {
     val matches = vt100EscapeSequences.findAll(this).toList()
     val escapeSeqLength = if (matches.count() == 0) {

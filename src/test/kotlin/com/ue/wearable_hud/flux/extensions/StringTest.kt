@@ -10,6 +10,30 @@ class StringTest {
     val PLAIN_TEST = "TEST"
 
     @Test
+    fun strippingVT100FromPlainStringDoesNothing() {
+        val stripped = PLAIN_TEST.stripVT100Sequences()
+        assertThat(stripped, `is`(PLAIN_TEST))
+    }
+
+    @Test
+    fun strippingVT100FromVT100StringRemovesEscapedSequences() {
+        val stripped = VT100_TEST.stripVT100Sequences()
+        assertThat(stripped, `is`(PLAIN_TEST)) // Afterward these should be equal
+    }
+
+    @Test
+    fun strippingVT100FromVT100StringWithLeadingSequenceRemovesEscapedSequences() {
+        val stripped = (LAST_CODE + VT100_TEST).stripVT100Sequences()
+        assertThat(stripped, `is`(PLAIN_TEST)) // Afterward these should be equal
+    }
+
+    @Test
+    fun strippingVT100FromVT100StringWithNoTrailingSequenceRemovesEscapedSequences() {
+        val stripped = "T$ESC[33mE$ESC[96mS$ESC[39mT".stripVT100Sequences()
+        assertThat(stripped, `is`(PLAIN_TEST)) // Afterward these should be equal
+    }
+
+    @Test
     fun slicingVT100StringLargerThanStringReturnsString() {
         val sliced = VT100_TEST.visibleCharSlice(0..100)
         assertThat(sliced, `is`(VT100_TEST))

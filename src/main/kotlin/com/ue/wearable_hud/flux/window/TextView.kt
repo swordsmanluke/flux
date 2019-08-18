@@ -91,7 +91,7 @@ class NullView: TextView {
 
     override var storedLines: MutableList<String>
         get() = mutableListOf()
-        set(value) {}
+        set(_) {}
 
     override fun getLines(): List<String> = storedLines
 }

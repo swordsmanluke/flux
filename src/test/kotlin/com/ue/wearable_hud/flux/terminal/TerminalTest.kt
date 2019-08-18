@@ -1,13 +1,9 @@
 package com.ue.wearable_hud.flux.terminal
 
-import com.ue.wearable_hud.flux.program.FluxConfiguration
-import com.ue.wearable_hud.flux.task.NullTask
+import com.ue.wearable_hud.flux.extensions.stripVT100Sequences
+import com.ue.wearable_hud.flux.task.CommandTask
 import com.ue.wearable_hud.flux.task.Task
-import com.ue.wearable_hud.flux.window.Console
-import com.ue.wearable_hud.flux.window.TextView
-import com.ue.wearable_hud.flux.window.Window
-import com.ue.wearable_hud.flux.window.WindowManager
-import org.hamcrest.CoreMatchers.`is`
+import org.hamcrest.CoreMatchers.*
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -20,7 +16,7 @@ class TerminalTest {
         term.sendCharacter('b')
         term.sendCharacter('c')
 
-        assertThat(term.commandString, `is`("abc"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("abc"))
     }
 
     @Test
@@ -69,7 +65,7 @@ class TerminalTest {
         term.sendCharacter('b')
         term.sendCharacter('c')
 
-        assertThat(term.commandString, `is`("abcd"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("abcd"))
     }
 
     @Test
@@ -105,18 +101,6 @@ class TerminalTest {
     }
 
     @Test
-    fun sendingEnterCharExecutesCommand() {
-        val term = buildEmptyTerminal()
-        term.sendCharacter('a')
-        term.sendCharacter('b')
-
-        assertThat(spyTask.command, `is`(""))
-        term.sendCharacter('\n')
-
-        assertThat(spyTask.command, `is`("ab"))
-    }
-
-    @Test
     fun sendingEnterKeyExecutesCommand() {
         val term = buildEmptyTerminal()
         term.sendCharacter('a')
@@ -149,7 +133,7 @@ class TerminalTest {
         term.sendCharacter('b')
         term.sendCharacter(key=TerminalKey.BACKSPACE)
 
-        assertThat(term.commandString, `is`("a"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("a"))
     }
 
     @Test
@@ -160,8 +144,8 @@ class TerminalTest {
         term.sendCharacter(key=TerminalKey.BACKSPACE)
         term.sendCharacter(key=TerminalKey.BACKSPACE)
 
-        assertThat(term.commandString.isEmpty(), `is`(true))
-        assertThat(term.commandString.isNotEmpty(), `is`(false))
+        assertThat(term.commandString.stripVT100Sequences().trim().isEmpty(), `is`(true))
+        assertThat(term.commandString.stripVT100Sequences().trim().isNotEmpty(), `is`(false))
     }
 
     @Test
@@ -172,7 +156,7 @@ class TerminalTest {
         term.moveCursorAbsolute(0)
         term.sendCharacter(key=TerminalKey.BACKSPACE)
 
-        assertThat(term.commandString, `is`("ab"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("ab"))
     }
 
     @Test
@@ -183,7 +167,7 @@ class TerminalTest {
         term.moveCursorAbsolute(0)
         term.sendCharacter(key=TerminalKey.DELETE)
 
-        assertThat(term.commandString, `is`("b"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("b"))
     }
 
     @Test
@@ -193,7 +177,18 @@ class TerminalTest {
         term.sendCharacter('b')
         term.sendCharacter(key=TerminalKey.DELETE)
 
-        assertThat(term.commandString, `is`("ab"))
+        assertThat(term.commandString.stripVT100Sequences().trim(), `is`("ab"))
+    }
+
+    @Test
+    fun executingCommandSwitchesPrimaryTask() {
+        val term = buildEmptyTerminal()
+        term.sendCharacter('a')
+        term.sendCharacter(key = TerminalKey.ENTER)
+
+        assertNotNull(primaryTask)
+        // We expect this task to be wrapped in a CommandTask
+        assertTrue((primaryTask as CommandTask).subTask == spyTask)
     }
 
     private val spyTask = object : Task {
@@ -217,12 +212,18 @@ class TerminalTest {
             return getLines()
         }
 
-        override fun sendCommand(command: List<String>) {
-            this.command = command.joinToString(" ")
+        override fun sendCommand(command: List<String>): Collection<String> {
+            this.command = command.joinToString(" ") { s ->
+                s.stripVT100Sequences().trim()
+            }
+            return getLines()
         }
     }
 
+    var primaryTask: Task? = null
+    val makeTaskPrimary = fun (t: Task) { primaryTask = t }
+
     private fun buildEmptyTerminal(): Terminal {
-        return Terminal({ _ -> spyTask })  // Always return spyTask as active task
+        return Terminal({ spyTask }, makeTaskPrimary)   // Always return spyTask in 'active task' lambda
     }
 }

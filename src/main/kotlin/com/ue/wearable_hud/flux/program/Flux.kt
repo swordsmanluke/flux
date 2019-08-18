@@ -1,5 +1,6 @@
 package com.ue.wearable_hud.flux.program
 
+import com.googlecode.lanterna.input.KeyStroke
 import com.googlecode.lanterna.input.KeyType
 import com.ue.wearable_hud.flux.task.StaticTask
 import com.ue.wearable_hud.flux.terminal.KeyModifier
@@ -47,7 +48,7 @@ class Flux(val context: FluxConfiguration, val terminal: Terminal) {
     private suspend fun runInputLoop(console: LanternaConsole) {
         do {
             try {
-                delay(100)
+                delay(1) // Yield briefly so other coroutines can run
                 val input = console.screen.terminal.pollInput() ?: continue
 
                 if (input.isCtrlDown && input.character.toLowerCase() == 'c') {
@@ -55,43 +56,9 @@ class Flux(val context: FluxConfiguration, val terminal: Terminal) {
                     shouldExit = true
                     break
                 } else {
-                    val c = if (input.isShiftDown) input.character?.toUpperCase() else input.character
-
-                    val modifiers = mutableListOf<KeyModifier>()
-
-                    if (input.isAltDown) modifiers.add(KeyModifier.ALT)
-                    if (input.isCtrlDown) modifiers.add(KeyModifier.CTRL)
-
-                    val key = when (input.keyType) {
-                        KeyType.Escape -> TerminalKey.ESC
-                        KeyType.Delete -> TerminalKey.DELETE
-                        KeyType.Backspace -> TerminalKey.BACKSPACE
-                        KeyType.Enter -> TerminalKey.ENTER
-//                        KeyType.ArrowLeft -> TODO()
-//                        KeyType.ArrowRight -> TODO()
-//                        KeyType.ArrowUp -> TODO()
-//                        KeyType.ArrowDown -> TODO()
-//                        KeyType.Home -> TODO()
-//                        KeyType.End -> TODO()
-//                        KeyType.Tab -> TODO()
-//                        KeyType.ReverseTab -> TODO()
-                        else -> null
-                    }
-
-                    terminal.sendCharacter(c, key, modifiers)
+                    handleTerminalInput(input)
                     adjustBottomOfMainWindow()
-
-                    val terminalTask = context.getTask(context.windowManager.terminalWindow) as StaticTask
-                    val terminalView = context.getView(context.windowManager.terminalWindow)
-
-                    if (terminal.commandString.isNotEmpty()) {
-                        val formattedCommand = "> ${terminal.commandString}"
-                        terminalTask.update(listOf(formattedCommand))
-                    } else {
-                        terminalTask.update(listOf())
-                    }
-
-                    terminalView.replaceLines(terminalTask.getLines())
+                    updateTerminalDisplay()
                     refreshUI()
                 }
             } catch (e: Exception) {
@@ -100,27 +67,46 @@ class Flux(val context: FluxConfiguration, val terminal: Terminal) {
         } while (true)
     }
 
-    private fun adjustBottomOfMainWindow() {
-        val mainWindow = context.windowManager.mainWindow
-        val terminalWindow = context.windowManager.terminalWindow
-        val mainWindowTooSmall = mainWindow.maxY < mainWindowBottom
-        val mainWindowFullSize = !mainWindowTooSmall
-        val commandPresent = terminal.commandString.isNotEmpty()
+    private fun updateTerminalDisplay() {
+        val terminalTask = context.getTask(context.windowManager.terminalWindow) as StaticTask
+        val terminalView = context.getView(context.windowManager.terminalWindow)
 
-        when (commandPresent) {
-            true  -> if(mainWindowFullSize) {
-                logger.info("Detected new command - shrinking main window")
-                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height - 1)
-                context.windowManager.resizeWindow(terminalWindow.handle, x=mainWindow.x, y=mainWindow.maxY - 1, width=mainWindow.width, height=1)
-                refreshUI()
-            }
-            false -> if(mainWindowTooSmall) {
-                logger.info("Detected command cleared - restoring main window")
-                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height + 1)
-                context.windowManager.resizeWindow(terminalWindow.handle, x=0, y=0, width=0, height=0)
-                refreshUI()
-            }
+        if (terminal.commandString.isNotEmpty()) {
+            val formattedCommand = "> ${terminal.commandString}"
+            terminalTask.update(listOf(formattedCommand))
+        } else {
+            terminalTask.update(listOf())
         }
+
+        terminalView.replaceLines(terminalTask.getLines())
+    }
+
+    private fun handleTerminalInput(input: KeyStroke) {
+        val c = if (input.isShiftDown) input.character?.toUpperCase() else input.character
+
+        val modifiers = mutableListOf<KeyModifier>()
+
+        if (input.isAltDown) modifiers.add(KeyModifier.ALT)
+        if (input.isCtrlDown) modifiers.add(KeyModifier.CTRL)
+        if (input.isShiftDown) modifiers.add(KeyModifier.SHIFT)
+
+        val key = when (input.keyType) {
+            KeyType.Escape -> TerminalKey.ESC
+            KeyType.Delete -> TerminalKey.DELETE
+            KeyType.Backspace -> TerminalKey.BACKSPACE
+            KeyType.Enter -> TerminalKey.ENTER
+            KeyType.ArrowLeft -> TerminalKey.LEFT
+            KeyType.ArrowRight -> TerminalKey.RIGHT
+    //                        KeyType.ArrowUp -> TODO()
+    //                        KeyType.ArrowDown -> TODO()
+            KeyType.Home -> TerminalKey.HOME
+            KeyType.End -> TerminalKey.END
+    //                        KeyType.Tab -> TODO()
+    //                        KeyType.ReverseTab -> TODO()
+            else -> null
+        }
+
+        terminal.sendCharacter(c, key, modifiers)
     }
 
     private suspend fun runRefreshTaskLoop() {
@@ -199,5 +185,28 @@ class Flux(val context: FluxConfiguration, val terminal: Terminal) {
         val lastErrLine = Math.min(errors.count(), context.windowManager.mainWindow.height)
         errTask.update(errors.slice(0..lastErrLine))
         context.setTask(context.windowManager.mainWindow, errTask)
+    }
+
+    private fun adjustBottomOfMainWindow() {
+        val mainWindow = context.windowManager.mainWindow
+        val terminalWindow = context.windowManager.terminalWindow
+        val mainWindowTooSmall = mainWindow.maxY < mainWindowBottom
+        val mainWindowFullSize = !mainWindowTooSmall
+        val commandPresent = terminal.commandString.isNotEmpty()
+
+        when (commandPresent) {
+            true  -> if(mainWindowFullSize) {
+                logger.info("Detected new command - shrinking main window")
+                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height - 1)
+                context.windowManager.resizeWindow(terminalWindow.handle, x=mainWindow.x, y=mainWindow.maxY - 1, width=mainWindow.width, height=1)
+                refreshUI()
+            }
+            false -> if(mainWindowTooSmall) {
+                logger.info("Detected command cleared - restoring main window")
+                context.windowManager.resizeWindow(mainWindow.handle, height=mainWindow.height + 1)
+                context.windowManager.resizeWindow(terminalWindow.handle, x=0, y=0, width=0, height=0)
+                refreshUI()
+            }
+        }
     }
 }

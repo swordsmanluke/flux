@@ -23,7 +23,7 @@ fun main(args: Array<String>) {
     val wm = WindowManager(console)
 
     val config = loadConfiguration(wm)
-    val terminal = Terminal({ s -> config.getTaskById(s) } ) // lambda to wrap the function refererence in a closure
+    val terminal = Terminal(config::getTaskById, config::setActiveTask)
     val prog = Flux(config, terminal)
 
     Runtime.getRuntime().addShutdownHook(object : Thread() {

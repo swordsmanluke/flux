@@ -1,5 +1,6 @@
 package com.ue.wearable_hud.flux.program
 
+import com.ue.wearable_hud.flux.task.CommandTask
 import com.ue.wearable_hud.flux.task.NullTask
 import com.ue.wearable_hud.flux.task.Task
 import com.ue.wearable_hud.flux.window.*
@@ -15,6 +16,13 @@ class FluxConfiguration(
 
     fun addTask(t: Task) {
         tasks.add(t)
+    }
+
+    private fun removeTask(task: Task) {
+        tasks.remove(task)
+        taskForWindow.filterKeys { k -> taskForWindow[k] == task }.forEach { k, _ ->
+            taskForWindow.remove(k)
+        }
     }
 
     fun getView(w: Window) : TextView {
@@ -33,7 +41,14 @@ class FluxConfiguration(
     }
 
     fun setTask(window: Window, task: Task) {
+        val oldtask = taskForWindow.getOrDefault(window.handle, NullTask())
         taskForWindow[window.handle] = task
+        if (!tasks.contains(task)) { addTask(task) }
+        if (!taskForWindow.values.contains(oldtask) && oldtask is CommandTask) { removeTask(oldtask) }
+    }
+
+    fun setActiveTask(task: Task) {
+        setTask(windowManager.mainWindow, task)
     }
 
     fun getTaskById(taskId: String): Task {

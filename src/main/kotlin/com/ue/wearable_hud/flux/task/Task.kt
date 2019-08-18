@@ -3,6 +3,7 @@ package com.ue.wearable_hud.flux.task
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.io.File
 import java.io.IOException
@@ -16,10 +17,10 @@ interface Task {
     fun readyToSchedule(): Boolean
     fun getLines(): Collection<String>
     suspend fun run(): Collection<String>
-    fun sendCommand(command: List<String>)
+    fun sendCommand(command: List<String>): Collection<String>
 }
 
-class StaticTask(override val id: String, var strings: Collection<String> = emptyList()): Task {
+class StaticTask(override val id: String, var strings: Collection<String> = emptyList()) : Task {
     init {
         logger.info { "Creating new StaticTask for task $id" }
     }
@@ -32,11 +33,11 @@ class StaticTask(override val id: String, var strings: Collection<String> = empt
     override fun readyToSchedule(): Boolean = false // Never updates
     override fun getLines(): Collection<String> = strings
     override suspend fun run(): Collection<String> = strings
-    override fun sendCommand(command: List<String>) {} // Static Tasks do not support commands
+    override fun sendCommand(command: List<String>): Collection<String> = strings // Static Tasks do not support commands
 }
 
 class UnixTask(override val id: String, val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
-    private var lines: Collection<String> = emptyList()
+    private var lines = emptyList<String>()
     private var lastRun = 0L
     private var running = false
 
@@ -72,13 +73,18 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
         }
     }
 
-    override fun sendCommand(command: List<String>) {
-        GlobalScope.launch { runCommand(command) }
+    override fun sendCommand(command: List<String>): Collection<String> {
+        runBlocking {
+            runCommand(command)
+        }
+        return lines
     }
 
     private suspend fun runCommand(args: List<String> = emptyList()): List<String> {
         val parts = command.split("\\s".toRegex()) + args
         var text = ""
+        var exitCode = -1000
+
         val backgroundRunner = Thread {
 
             val proc = ProcessBuilder(*parts.toTypedArray())
@@ -88,8 +94,8 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
                     .start()
 
             proc.waitFor(1, TimeUnit.MINUTES)
-
-            text = proc.inputStream.bufferedReader().readText()
+            exitCode = proc.exitValue()
+            text = proc.inputStream.bufferedReader().readText() + proc.errorStream.bufferedReader().readText()
         }
 
         backgroundRunner.start()
@@ -99,7 +105,7 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
         }
 
         lastRun = System.currentTimeMillis()
-
+        logger.info { "Command '${parts.joinToString(" ")}' exit: $exitCode" }
         val lines = text.split("\n")
         val lastLine = if (lines.last() == "") lines.count() - 1 else lines.count() // Strip out an empty last line
         this.lines = lines.slice(0 until lastLine)
@@ -117,5 +123,5 @@ class NullTask : Task {
     override fun readyToSchedule(): Boolean = false // Never needs to be run
     override fun getLines(): Collection<String> = emptyList()
     override suspend fun run(): Collection<String> = emptyList()
-    override fun sendCommand(command: List<String>) {}
+    override fun sendCommand(command: List<String>): Collection<String> = emptyList()
 }
