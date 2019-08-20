@@ -16,8 +16,7 @@ import kotlin.system.measureTimeMillis
 private val logger = KotlinLogging.logger {}
 
 class Flux(val context: FluxConfiguration, val terminal: Terminal) {
-
-    val taskRunnerCtx = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
+    val taskRunnerCtx = Executors.newFixedThreadPool(3).asCoroutineDispatcher()
     val errTask = StaticTask("errors", emptyList()) // Task for displaying errors
     var shouldExit = false
     var mainWindowBottom = context.windowManager.mainWindow.maxY
