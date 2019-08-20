@@ -1,8 +1,6 @@
 package com.ue.wearable_hud.flux.task
 
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.io.File
@@ -38,20 +36,14 @@ class StaticTask(override val id: String, var strings: Collection<String> = empt
 
 class UnixTask(override val id: String, val workingDir: File, val command: String, val refreshPeriodSec: Int) : Task {
     private var lines = emptyList<String>()
-    private var lastRun = 0L
+    private var nextRun = 0L
     private var running = false
 
     init {
         logger.info { "Creating new UnixTask for task $id. Command: '${workingDir}/$command' Refresh: ${refreshPeriodSec}s" }
     }
 
-    override fun nextRunAt(): Long {
-        val nextRefresh = refreshPeriodSec * 1000
-        // Add +-5 % jitter to avoid same-time refreshes
-        // val negativeJitterOffset = -(nextRefresh*0.05).toInt()
-        // val jitter = Random.nextInt(negativeJitterOffset, (nextRefresh*0.1).toInt())
-        return lastRun + nextRefresh
-    }
+    override fun nextRunAt() = nextRun
 
     override fun readyToSchedule(): Boolean {
         return !running && System.currentTimeMillis() > nextRunAt()
@@ -81,8 +73,25 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
     }
 
     private suspend fun runCommand(args: List<String> = emptyList()): List<String> {
+        val (stdout, stderr, exitCode) = execBackgroundTask(args)
+
+        val lines = (stdout + stderr).split("\n") // TODO: Color stderr red? Set shorter timeout if stderr present?
+        val lastLine = if (lines.last().isBlank()) lines.count() - 1 else lines.count() // Strip out an empty last line
+        this.lines = lines.slice(0 until lastLine)
+
+        nextRun = System.currentTimeMillis() + refreshPeriodSec * 1000
+
+        if (exitCode != 0) {
+            logger.error { "Task ${id} failed with error code $exitCode\n${stderr}" }
+        }
+
+        return lines
+    }
+
+    private suspend fun execBackgroundTask(args: List<String>): Triple<String, String, Int> {
         val parts = command.split("\\s".toRegex()) + args
-        var text = ""
+        var stdout = ""
+        var stderr = ""
         var exitCode = -1000
 
         val backgroundRunner = Thread {
@@ -95,7 +104,8 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
 
             proc.waitFor(1, TimeUnit.MINUTES)
             exitCode = proc.exitValue()
-            text = proc.inputStream.bufferedReader().readText() + proc.errorStream.bufferedReader().readText()
+            stdout = proc.inputStream.bufferedReader().readText()
+            stderr = proc.errorStream.bufferedReader().readText()
         }
 
         backgroundRunner.start()
@@ -103,13 +113,9 @@ class UnixTask(override val id: String, val workingDir: File, val command: Strin
         while (backgroundRunner.isAlive) {
             delay(100)
         }
-
-        lastRun = System.currentTimeMillis()
         logger.info { "Command '${parts.joinToString(" ")}' exit: $exitCode" }
-        val lines = text.split("\n")
-        val lastLine = if (lines.last() == "") lines.count() - 1 else lines.count() // Strip out an empty last line
-        this.lines = lines.slice(0 until lastLine)
-        return lines
+
+        return Triple(stdout, stderr, exitCode)
     }
 }
 
